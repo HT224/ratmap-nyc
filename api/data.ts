@@ -99,8 +99,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         '$order': 'count DESC',
       }),
     ])
-    const zips = [...new Set(zipCounts.map((row: Record<string, string>) => row.incident_zip))]
-      .filter((zip): zip is string => /^\d{5}$/.test(zip))
+    const zips = [...new Set<string>(
+      (zipCounts as Array<Record<string, string>>).map((row) => row.incident_zip),
+    )].filter((zip) => /^\d{5}$/.test(zip))
     const { populations, release } = await populationsFor(zips)
     const zipStats = zipCounts
       .filter((row: Record<string, string>) => populations[row.incident_zip])
