@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { Component, useEffect, useRef, useState, type ErrorInfo, type ReactNode } from 'react'
 import maplibregl, { type GeoJSONSource, type Map } from 'maplibre-gl'
 
 type Bin = { lat: number; lon: number; count: number; zip: string; rate: number }
@@ -39,7 +39,20 @@ function number(value: number | string) {
 function RatMap({ bins, mode }: { bins: Bin[]; mode: 'raw' | 'normalized' }) {
   const container = useRef<HTMLDivElement>(null)
   const map = useRef<Map | null>(null)
+  const dataRef = useRef<GeoJSON.FeatureCollection>({ type: 'FeatureCollection', features: [] })
+  const modeRef = useRef(mode)
   const [unsupported, setUnsupported] = useState(false)
+
+  const geojson: GeoJSON.FeatureCollection = {
+    type: 'FeatureCollection',
+    features: bins.map((bin) => ({
+      type: 'Feature',
+      properties: { count: bin.count, rate: bin.rate, weight: mode === 'raw' ? bin.count : bin.rate },
+      geometry: { type: 'Point', coordinates: [bin.lon, bin.lat] },
+    })),
+  }
+  dataRef.current = geojson
+  modeRef.current = mode
 
   useEffect(() => {
     if (!container.current || map.current) return
@@ -59,6 +72,50 @@ function RatMap({ bins, mode }: { bins: Bin[]; mode: 'raw' | 'normalized' }) {
     }
     map.current.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right')
     map.current.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-left')
+    map.current.once('load', () => {
+      const current = map.current
+      if (!current || current.getSource('complaints')) return
+      try {
+        current.addSource('complaints', { type: 'geojson', data: dataRef.current })
+        current.addLayer({
+          id: 'rat-heat',
+          type: 'heatmap',
+          source: 'complaints',
+          maxzoom: 15,
+          paint: {
+            'heatmap-weight': ['interpolate', ['linear'], ['get', 'weight'], 0, 0, modeRef.current === 'raw' ? 80 : 8, 1],
+            'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 8, 0.8, 13, 2.4],
+            'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 8, 11, 13, 34],
+            'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 8, 0.82, 15, 0.55],
+            'heatmap-color': [
+              'interpolate', ['linear'], ['heatmap-density'],
+              0, 'rgba(37,28,18,0)',
+              0.12, '#6f5c2f',
+              0.3, '#d5ad43',
+              0.52, '#f37735',
+              0.72, '#e93635',
+              0.9, '#b60b46',
+              1, '#fff0db',
+            ],
+          },
+        })
+        current.addLayer({
+          id: 'rat-points',
+          type: 'circle',
+          source: 'complaints',
+          minzoom: 13,
+          paint: {
+            'circle-radius': ['interpolate', ['linear'], ['get', 'count'], 1, 2, 100, 11],
+            'circle-color': '#ff5d3a',
+            'circle-opacity': 0.68,
+            'circle-stroke-color': '#fff0db',
+            'circle-stroke-width': 0.7,
+          },
+        })
+      } catch {
+        setUnsupported(true)
+      }
+    })
     return () => {
       map.current?.remove()
       map.current = null
@@ -67,59 +124,18 @@ function RatMap({ bins, mode }: { bins: Bin[]; mode: 'raw' | 'normalized' }) {
 
   useEffect(() => {
     const current = map.current
-    if (!current) return
-    const geojson: GeoJSON.FeatureCollection = {
-      type: 'FeatureCollection',
-      features: bins.map((bin) => ({
-        type: 'Feature',
-        properties: { count: bin.count, rate: bin.rate, weight: mode === 'raw' ? bin.count : bin.rate },
-        geometry: { type: 'Point', coordinates: [bin.lon, bin.lat] },
-      })),
-    }
-    const sync = () => {
+    if (!current || !current.isStyleLoaded()) return
+    try {
       const source = current.getSource('complaints') as GeoJSONSource | undefined
-      if (source) {
-        source.setData(geojson)
-        return
+      source?.setData(geojson)
+      if (current.getLayer('rat-heat')) {
+        current.setPaintProperty('rat-heat', 'heatmap-weight', [
+          'interpolate', ['linear'], ['get', 'weight'], 0, 0, mode === 'raw' ? 80 : 8, 1,
+        ])
       }
-      current.addSource('complaints', { type: 'geojson', data: geojson })
-      current.addLayer({
-        id: 'rat-heat',
-        type: 'heatmap',
-        source: 'complaints',
-        maxzoom: 15,
-        paint: {
-          'heatmap-weight': ['interpolate', ['linear'], ['get', 'weight'], 0, 0, mode === 'raw' ? 80 : 8, 1],
-          'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 8, 0.8, 13, 2.4],
-          'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 8, 11, 13, 34],
-          'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 8, 0.82, 15, 0.55],
-          'heatmap-color': [
-            'interpolate', ['linear'], ['heatmap-density'],
-            0, 'rgba(37,28,18,0)',
-            0.12, '#6f5c2f',
-            0.3, '#d5ad43',
-            0.52, '#f37735',
-            0.72, '#e93635',
-            0.9, '#b60b46',
-            1, '#fff0db',
-          ],
-        },
-      })
-      current.addLayer({
-        id: 'rat-points',
-        type: 'circle',
-        source: 'complaints',
-        minzoom: 13,
-        paint: {
-          'circle-radius': ['interpolate', ['linear'], ['get', 'count'], 1, 2, 100, 11],
-          'circle-color': '#ff5d3a',
-          'circle-opacity': 0.68,
-          'circle-stroke-color': '#fff0db',
-          'circle-stroke-width': 0.7,
-        },
-      })
+    } catch {
+      setUnsupported(true)
     }
-    current.isStyleLoaded() ? sync() : current.once('load', sync)
   }, [bins, mode])
 
   return (
@@ -128,6 +144,25 @@ function RatMap({ bins, mode }: { bins: Bin[]; mode: 'raw' | 'normalized' }) {
       {unsupported && <div className="map-fallback">This browser cannot render the WebGL map.<br />The live complaint statistics remain available.</div>}
     </>
   )
+}
+
+class AppErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false }
+
+  static getDerivedStateFromError() {
+    return { failed: true }
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('Ratmap rendering error', error, info)
+  }
+
+  render() {
+    if (this.state.failed) {
+      return <div className="fatal-error">The map hit a rendering error.<button onClick={() => window.location.reload()}>Reload Ratmap</button></div>
+    }
+    return this.props.children
+  }
 }
 
 function Trend({ rows }: { rows: MonthRow[] }) {
@@ -147,7 +182,7 @@ function Trend({ rows }: { rows: MonthRow[] }) {
   )
 }
 
-export default function App() {
+function RatmapApp() {
   const [windowKey, setWindowKey] = useState('1y')
   const [borough, setBorough] = useState('ALL')
   const [mode, setMode] = useState<'raw' | 'normalized'>('raw')
@@ -246,4 +281,8 @@ export default function App() {
       </footer>
     </main>
   )
+}
+
+export default function App() {
+  return <AppErrorBoundary><RatmapApp /></AppErrorBoundary>
 }

@@ -36,6 +36,8 @@ select { appearance: none; color: #f8f3e8; background: #302b25; border: 0; borde
 .mix b { color: #ff7252; margin-left: 2px; }
 .loading, .error { min-height: 140px; display: grid; place-items: center; color: #aaa095; font-size: 12px; text-align: center; }
 .error { color: #ff8d73; }
+.fatal-error { width: 100%; height: 100%; display: grid; place-content: center; gap: 14px; color: #c5bbb0; text-align: center; background: #12100e; }
+.fatal-error button { border: 0; border-radius: 8px; padding: 10px 14px; color: #17120e; background: #ff6542; cursor: pointer; }
 footer { position: absolute; z-index: 2; bottom: 14px; left: 30px; right: 30px; display: flex; justify-content: space-between; pointer-events: none; color: #9b9389; font: 9px "DM Mono"; text-transform: uppercase; letter-spacing: .06em; text-shadow: 0 1px 4px #000; }
 .maplibregl-ctrl-bottom-left { bottom: 20px; }
 .maplibregl-ctrl-attrib { background: #181512aa !important; color: #8b8379 !important; }
