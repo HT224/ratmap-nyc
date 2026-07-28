@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import maplibregl, { type GeoJSONSource, type Map } from 'maplibre-gl'
 
-type Bin = { lat: number; lon: number; count: number }
+type Bin = { lat: number; lon: number; count: number; zip: string; rate: number }
 type CountRow = { count: string }
 type BoroughRow = CountRow & { borough: string }
 type MonthRow = CountRow & { month: string }
-type ZipRow = CountRow & { incident_zip: string }
+type ZipStat = { zip: string; count: number; population: number; rate: number }
 type DescriptorRow = CountRow & { descriptor: string }
 
 type Data = {
@@ -14,10 +14,12 @@ type Data = {
   window: string
   borough: string
   total: number
+  ratePer10k: number
+  populationSource: string
   bins: Bin[]
   byBorough: BoroughRow[]
   byMonth: MonthRow[]
-  topZips: ZipRow[]
+  zipStats: ZipStat[]
   descriptors: DescriptorRow[]
 }
 
@@ -34,7 +36,7 @@ function number(value: number | string) {
   return Number(value).toLocaleString()
 }
 
-function RatMap({ bins }: { bins: Bin[] }) {
+function RatMap({ bins, mode }: { bins: Bin[]; mode: 'raw' | 'normalized' }) {
   const container = useRef<HTMLDivElement>(null)
   const map = useRef<Map | null>(null)
   const [unsupported, setUnsupported] = useState(false)
@@ -70,7 +72,7 @@ function RatMap({ bins }: { bins: Bin[] }) {
       type: 'FeatureCollection',
       features: bins.map((bin) => ({
         type: 'Feature',
-        properties: { count: bin.count },
+        properties: { count: bin.count, rate: bin.rate, weight: mode === 'raw' ? bin.count : bin.rate },
         geometry: { type: 'Point', coordinates: [bin.lon, bin.lat] },
       })),
     }
@@ -87,7 +89,7 @@ function RatMap({ bins }: { bins: Bin[] }) {
         source: 'complaints',
         maxzoom: 15,
         paint: {
-          'heatmap-weight': ['interpolate', ['linear'], ['get', 'count'], 0, 0, 100, 1],
+          'heatmap-weight': ['interpolate', ['linear'], ['get', 'weight'], 0, 0, mode === 'raw' ? 80 : 8, 1],
           'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 8, 0.8, 13, 2.4],
           'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 8, 11, 13, 34],
           'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 8, 0.82, 15, 0.55],
@@ -118,7 +120,7 @@ function RatMap({ bins }: { bins: Bin[] }) {
       })
     }
     current.isStyleLoaded() ? sync() : current.once('load', sync)
-  }, [bins])
+  }, [bins, mode])
 
   return (
     <>
@@ -148,6 +150,7 @@ function Trend({ rows }: { rows: MonthRow[] }) {
 export default function App() {
   const [windowKey, setWindowKey] = useState('1y')
   const [borough, setBorough] = useState('ALL')
+  const [mode, setMode] = useState<'raw' | 'normalized'>('raw')
   const [data, setData] = useState<Data | null>(null)
   const [error, setError] = useState('')
 
@@ -168,7 +171,7 @@ export default function App() {
 
   return (
     <main>
-      <RatMap bins={data?.bins ?? []} />
+      <RatMap bins={data?.bins ?? []} mode={mode} />
       <header className="brand">
         <div className="rat-mark" aria-hidden="true">R</div>
         <div>
@@ -178,6 +181,10 @@ export default function App() {
       </header>
 
       <section className="controls" aria-label="Map controls">
+        <div className="mode-toggle" aria-label="Normalization">
+          <button className={mode === 'raw' ? 'active' : ''} onClick={() => setMode('raw')}>Raw</button>
+          <button className={mode === 'normalized' ? 'active' : ''} onClick={() => setMode('normalized')}>Per 10k</button>
+        </div>
         <label>
           Time range
           <select value={windowKey} onChange={(event) => setWindowKey(event.target.value)}>
@@ -195,14 +202,14 @@ export default function App() {
       <aside className="panel">
         {error ? <div className="error">{error}</div> : !data ? <div className="loading">Scouting the boroughs…</div> : (
           <>
-            <p className="eyebrow">311 RAT COMPLAINTS</p>
-            <div className="total">{number(data.total)}</div>
+            <p className="eyebrow">{mode === 'raw' ? '311 RAT COMPLAINTS' : 'COMPLAINTS PER 10K RESIDENTS'}</p>
+            <div className="total">{mode === 'raw' ? number(data.total) : data.ratePer10k.toFixed(1)}</div>
             <p className="period">since {new Date(`${data.startDate}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
 
             <div className="section-title"><span>Monthly pulse</span><span>low → high</span></div>
             <Trend rows={data.byMonth} />
 
-            {borough === 'ALL' && (
+            {borough === 'ALL' && mode === 'raw' && (
               <>
                 <div className="section-title"><span>By borough</span><span>reports</span></div>
                 <ol className="ranking">
@@ -213,10 +220,13 @@ export default function App() {
               </>
             )}
 
-            <div className="section-title"><span>Hottest ZIPs</span><span>reports</span></div>
+            <div className="section-title"><span>Hottest ZIPs</span><span>{mode === 'raw' ? 'reports' : 'per 10k'}</span></div>
             <ol className="ranking zips">
-              {data.topZips.slice(0, 5).map((row, index) => (
-                <li key={row.incident_zip}><span><i>{index + 1}</i>{row.incident_zip}</span><strong>{number(row.count)}</strong></li>
+              {[...data.zipStats]
+                .sort((a, b) => mode === 'raw' ? b.count - a.count : b.rate - a.rate)
+                .slice(0, 5)
+                .map((row, index) => (
+                <li key={row.zip}><span><i>{index + 1}</i>{row.zip}</span><strong>{mode === 'raw' ? number(row.count) : row.rate.toFixed(1)}</strong></li>
               ))}
             </ol>
 
@@ -232,7 +242,7 @@ export default function App() {
 
       <footer>
         <span>Live NYC 311 Open Data · refreshed hourly</span>
-        <span>Reports are not a census of rats.</span>
+        <span>{mode === 'raw' ? 'Reports are not a census of rats.' : `${data?.populationSource ?? 'ACS'} population estimate.`}</span>
       </footer>
     </main>
   )

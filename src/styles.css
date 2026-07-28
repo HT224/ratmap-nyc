@@ -14,6 +14,9 @@ h1 span { color: #ff6542; }
 .brand p { margin: 5px 0 0; color: #aaa195; font-size: 11px; letter-spacing: .06em; }
 .controls { position: absolute; top: 28px; left: 50%; transform: translateX(-50%); z-index: 2; padding: 7px; display: flex; gap: 6px; background: rgba(21,18,15,.9); border: 1px solid #4b443b; border-radius: 12px; box-shadow: 0 10px 35px #0008; backdrop-filter: blur(18px); }
 .controls label { display: flex; align-items: center; gap: 8px; color: #81786f; padding-left: 9px; font-family: "DM Mono"; font-size: 9px; text-transform: uppercase; letter-spacing: .06em; }
+.mode-toggle { display: flex; padding: 2px; border-radius: 8px; background: #0f0d0b; }
+.mode-toggle button { border: 0; border-radius: 6px; padding: 7px 9px; background: transparent; color: #81786f; font: 500 9px "DM Mono"; text-transform: uppercase; cursor: pointer; }
+.mode-toggle button.active { color: #17120e; background: #ff6542; }
 select { appearance: none; color: #f8f3e8; background: #302b25; border: 0; border-radius: 7px; padding: 8px 28px 8px 10px; font-size: 11px; font-weight: 600; text-transform: capitalize; background-image: linear-gradient(45deg, transparent 50%, #91877c 50%), linear-gradient(135deg, #91877c 50%, transparent 50%); background-position: calc(100% - 12px) 13px, calc(100% - 8px) 13px; background-size: 4px 4px; background-repeat: no-repeat; }
 .panel { position: absolute; z-index: 2; top: 96px; right: 28px; width: 278px; max-height: calc(100% - 140px); overflow: auto; padding: 22px; background: rgba(24,21,18,.94); border: 1px solid #4b443b; border-radius: 15px; box-shadow: 0 20px 55px #000a; backdrop-filter: blur(20px); }
 .eyebrow, .section-title { font: 500 9px "DM Mono"; letter-spacing: .11em; text-transform: uppercase; color: #91877c; }
@@ -44,6 +47,7 @@ footer { position: absolute; z-index: 2; bottom: 14px; left: 30px; right: 30px; 
   .brand { top: 18px; left: 17px; }
   .brand p { display: none; }
   .controls { top: 72px; left: 12px; right: 12px; transform: none; }
+  .mode-toggle { align-self: flex-end; }
   .controls label { flex: 1; flex-direction: column; align-items: flex-start; gap: 4px; }
   .controls select { width: 100%; }
   .panel { top: auto; left: 12px; right: 12px; bottom: 35px; width: auto; max-height: 37%; padding: 16px 18px; }
