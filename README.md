@@ -2,6 +2,8 @@
 
 An interactive heatmap of rat-related complaints reported to NYC 311.
 
+**Live app:** [ratmap-nyc.vercel.app](https://ratmap-nyc.vercel.app/)
+
 ## What it shows
 
 - Density of geocoded rat complaints across all five boroughs
