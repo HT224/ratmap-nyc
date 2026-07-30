@@ -22,6 +22,22 @@ Complaints are not a census of rats. Reporting behavior, population density, and
 
 Population normalization uses ACS 2024 five-year ZIP Code Tabulation Area estimates from [Census Reporter](https://censusreporter.org/).
 
+## How it works
+
+```mermaid
+flowchart LR
+    U[Visitor filters] --> A[React app]
+    A -->|date range + borough| V[Vercel data function]
+    V -->|bounded SoQL query| N[NYC 311 Open Data]
+    V --> C[Cached response]
+    N --> C
+    C --> B[100 m geographic bins]
+    P[ACS ZIP populations] --> Z[Population normalization]
+    B --> Z
+    B --> H[Heatmap + trends]
+    Z --> H
+```
+
 ## Development
 
 ```bash
